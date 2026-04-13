@@ -1,0 +1,156 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2865
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 <!DOCTYPE html>\
+<html lang="zh-CN">\
+<head>\
+    <meta charset="UTF-8">\
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">\
+    <title>SAT \uc0\u39640 \u32423 \u38169 \u39064 \u26412 </title>\
+    <script src="https://cdn.tailwindcss.com"></script>\
+    <script src="https://unpkg.com/dexie/dist/dexie.js"></script> <!-- \uc0\u24341 \u20837  Dexie.js \u22788 \u29702 \u22823 \u22411 \u23384 \u20648  -->\
+    <style>\
+        .tab-content \{ display: none; \}\
+        .tab-content.active \{ display: block; \}\
+        .active-tab \{ border-bottom: 4px solid #3b82f6; color: #3b82f6; \}\
+    </style>\
+</head>\
+<body class="bg-gray-50 min-h-screen">\
+\
+    <nav class="bg-white shadow-md sticky top-0 z-50">\
+        <div class="max-w-6xl mx-auto px-4 flex justify-between items-center py-4">\
+            <h1 class="text-xl font-bold italic text-blue-600">SAT Error Notebook</h1>\
+            <div class="flex space-x-6">\
+                <button onclick="switchTab('reading')" id="tab-reading" class="tab-btn pb-2 active-tab">\uc0\u38405 \u35835 </button>\
+                <button onclick="switchTab('grammar')" id="tab-grammar" class="tab-btn pb-2 text-gray-500">\uc0\u35821 \u27861 </button>\
+                <button onclick="switchTab('math')" id="tab-math" class="tab-btn pb-2 text-gray-500">\uc0\u25968 \u23398 </button>\
+            </div>\
+        </div>\
+    </nav>\
+\
+    <main class="max-w-5xl mx-auto p-4">\
+        <div class="bg-white p-6 rounded-xl shadow-sm mb-8 mt-4 border border-blue-100">\
+            <h3 class="text-sm font-bold text-blue-400 mb-2 uppercase">\uc0\u26032 \u22686 \u39064 \u22411 \u26495 \u22359 </h3>\
+            <div class="flex gap-2">\
+                <input type="text" id="newCatInput" placeholder="\uc0\u20363 \u22914 : \u35821 \u27861 -\u26631 \u28857 \u31526 \u21495  / \u25968 \u23398 -\u20108 \u27425 \u20989 \u25968 " class="flex-1 p-2 border rounded-lg focus:ring-2 focus:ring-blue-400 outline-none">\
+                <button onclick="addNewCategory()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">\uc0\u28155 \u21152 </button>\
+            </div>\
+        </div>\
+\
+        <div id="content-area">\
+            <!-- \uc0\u21160 \u24577 \u29983 \u25104 \u30340 \u26495 \u22359 \u23558 \u20986 \u29616 \u22312 \u36825 \u37324  -->\
+        </div>\
+    </main>\
+\
+    <!-- \uc0\u24213 \u37096 \u29366 \u24577 \u26639  -->\
+    <div class="fixed bottom-0 left-0 right-0 bg-white border-t p-2 text-center text-xs text-gray-400">\
+        \uc0\u23384 \u20648 \u29366 \u24577 : \u27983 \u35272 \u22120 \u26412 \u22320 \u22823 \u23481 \u37327 \u23384 \u20648  (IndexedDB) \u24050 \u21551 \u29992 \
+    </div>\
+\
+    <script>\
+        // --- \uc0\u25968 \u25454 \u24211 \u21021 \u22987 \u21270  ---\
+        const db = new Dexie("SAT_Notebook_DB");\
+        db.version(1).stores(\{\
+            categories: '++id, tab, title, notes',\
+            questions: '++id, catId, image, correction'\
+        \});\
+\
+        let currentTab = 'reading';\
+\
+        // --- \uc0\u26680 \u24515 \u21151 \u33021  ---\
+\
+        async function loadAll() \{\
+            const container = document.getElementById('content-area');\
+            container.innerHTML = '';\
+            \
+            const cats = await db.categories.where('tab').equals(currentTab).toArray();\
+            \
+            for (const cat of cats) \{\
+                const section = await createCategoryElement(cat);\
+                container.appendChild(section);\
+            \}\
+        \}\
+\
+        async function addNewCategory() \{\
+            const input = document.getElementById('newCatInput');\
+            if (!input.value) return;\
+            \
+            await db.categories.add(\{\
+                tab: currentTab,\
+                title: input.value,\
+                notes: ''\
+            \});\
+            \
+            input.value = '';\
+            loadAll();\
+        \}\
+\
+        async function createCategoryElement(cat) \{\
+            const div = document.createElement('div');\
+            div.className = "mb-10 bg-white rounded-xl shadow-md border overflow-hidden";\
+            div.innerHTML = `\
+                <div class="bg-gray-800 text-white p-4 flex justify-between">\
+                    <h2 class="font-bold">$\{cat.title\}</h2>\
+                    <button onclick="deleteCategory($\{cat.id\})" class="text-xs opacity-50 hover:opacity-100">\uc0\u21024 \u38500 \u26495 \u22359 </button>\
+                </div>\
+                <div class="p-4">\
+                    <textarea onchange="updateNotes($\{cat.id\}, this.value)" placeholder="\uc0\u27492 \u22788 \u22635 \u20889 \u35813 \u39064 \u22411 \u36890 \u29992 \u31508 \u35760 ..." class="w-full p-3 bg-yellow-50 rounded-lg text-sm border-none focus:ring-1 focus:ring-yellow-300 mb-4">$\{cat.notes\}</textarea>\
+                    <div id="questions-$\{cat.id\}" class="space-y-4"></div>\
+                    <button onclick="addQuestion($\{cat.id\})" class="w-full mt-4 py-2 border-2 border-dashed border-gray-200 text-gray-400 rounded-lg hover:border-blue-300 hover:text-blue-500 transition">+ \uc0\u28155 \u21152 \u38169 \u39064 </button>\
+                </div>\
+            `;\
+\
+            // \uc0\u21152 \u36733 \u35813 \u31867 \u21035 \u19979 \u30340 \u39064 \u30446 \
+            const qs = await db.questions.where('catId').equals(cat.id).toArray();\
+            const qContainer = div.querySelector(`#questions-$\{cat.id\}`);\
+            qs.forEach(q => \{\
+                const qDiv = document.createElement('div');\
+                qDiv.className = "grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg relative";\
+                qDiv.innerHTML = `\
+                    <button onclick="deleteQuestion($\{q.id\})" class="absolute top-1 right-1 text-gray-300 hover:text-red-500">\uc0\u10005 </button>\
+                    <div class="border-2 border-dashed rounded bg-white flex flex-col items-center justify-center min-h-[150px] overflow-hidden">\
+                        $\{q.image ? `<img src="$\{q.image\}" class="max-w-full">` : `<input type="file" onchange="uploadImg($\{q.id\}, this)" class="text-xs">`\}\
+                    </div>\
+                    <textarea onchange="updateQuestionText($\{q.id\}, this.value)" placeholder="\uc0\u38169 \u35823 \u21407 \u22240 \u19982 \u24635 \u32467 ..." class="p-2 text-sm border rounded h-full">$\{q.correction || ''\}</textarea>\
+                `;\
+                qContainer.appendChild(qDiv);\
+            \});\
+\
+            return div;\
+        \}\
+\
+        async function addQuestion(catId) \{\
+            await db.questions.add(\{ catId: catId, image: '', correction: '' \});\
+            loadAll();\
+        \}\
+\
+        async function uploadImg(qId, input) \{\
+            const file = input.files[0];\
+            const reader = new FileReader();\
+            reader.onload = async (e) => \{\
+                await db.questions.update(qId, \{ image: e.target.result \});\
+                loadAll();\
+            \};\
+            reader.readAsDataURL(file);\
+        \}\
+\
+        async function updateNotes(id, val) \{ await db.categories.update(id, \{ notes: val \}); \}\
+        async function updateQuestionText(id, val) \{ await db.questions.update(id, \{ correction: val \}); \}\
+        async function deleteCategory(id) \{ if(confirm('\uc0\u30830 \u23450 \u21024 \u38500 ?')) \{ await db.categories.delete(id); loadAll(); \} \}\
+        async function deleteQuestion(id) \{ await db.questions.delete(id); loadAll(); \}\
+\
+        function switchTab(tab) \{\
+            currentTab = tab;\
+            document.querySelectorAll('.tab-btn').forEach(b => b.className = 'tab-btn pb-2 text-gray-500');\
+            document.getElementById('tab-'+tab).className = 'tab-btn pb-2 active-tab font-bold';\
+            loadAll();\
+        \}\
+\
+        window.onload = loadAll;\
+    </script>\
+</body>\
+</html>}
