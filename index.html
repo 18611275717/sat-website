@@ -3,147 +3,456 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SAT 高级错题本</title>
+    <title>SAT 错题集</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/dexie/dist/dexie.js"></script> <!-- 引入 Dexie.js 处理大型存储 -->
+    <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    
     <style>
+        body { font-family: 'Inter', sans-serif; scroll-behavior: smooth; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
-        .active-tab { border-bottom: 4px solid #3b82f6; color: #3b82f6; }
-    </style>
-</head>
-<body class="bg-gray-50 min-h-screen">
+        
+        .custom-input { font-size: 15px !important; line-height: 1.4 !important; transition: all 0.2s; }
+        .dark .custom-input, .dark input, .dark textarea, .dark select {
+            background-color: #131314 !important;
+            color: #e3e3e3 !important;
+            border-color: #333 !important;
+        }
 
-    <nav class="bg-white shadow-md sticky top-0 z-50">
-        <div class="max-w-6xl mx-auto px-4 flex justify-between items-center py-4">
-            <h1 class="text-xl font-bold italic text-blue-600">SAT Error Notebook</h1>
-            <div class="flex space-x-6">
-                <button onclick="switchTab('reading')" id="tab-reading" class="tab-btn pb-2 active-tab">阅读</button>
-                <button onclick="switchTab('grammar')" id="tab-grammar" class="tab-btn pb-2 text-gray-500">语法</button>
-                <button onclick="switchTab('math')" id="tab-math" class="tab-btn pb-2 text-gray-500">数学</button>
+        .dark body { background-color: #131314; color: #e3e3e3; }
+        .dark .card { background-color: #1e1f20; border-color: #333; }
+        
+        #sidebar { transition: transform 0.3s ease; }
+        .sidebar-hidden { transform: translateX(-100%); }
+
+        /* 核心：卡片边框颜色代码 (Color Coding) */
+        .card-not-started { border-left: 8px solid #ef4444 !important; }
+        .card-in-progress { border-left: 8px solid #f59e0b !important; }
+        .card-mastered { border-left: 8px solid #10b981 !important; }
+
+        /* 核心：下拉菜单按钮颜色代码 (Color Coding) */
+        .select-not-started { background-color: #ef4444 !important; color: white !important; border: none !important; }
+        .select-in-progress { background-color: #f59e0b !important; color: white !important; border: none !important; }
+        .select-mastered { background-color: #10b981 !important; color: white !important; border: none !important; }
+
+        .choice-btn { border: 2px solid #ddd; border-radius: 12px; padding: 8px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .dark .choice-btn { border-color: #444; }
+        .choice-correct { background-color: #10b981 !important; color: white !important; border-color: #10b981 !important; }
+        .choice-wrong { background-color: #ef4444 !important; color: white !important; border-color: #ef4444 !important; }
+        
+        .fab-container { position: fixed; right: 2.5rem; bottom: 2.5rem; z-index: 50; display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem; }
+        .fab-label { background: #3b82f6; color: white; padding: 4px 12px; border-radius: 8px; font-size: 12px; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        
+        .starred-card { border: 2px solid #f59e0b !important; box-shadow: 0 0 15px rgba(245, 158, 11, 0.2); }
+    </style>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { extend: { borderRadius: { '3xl': '1.75rem', '4xl': '2.5rem' } } }
+        }
+    </script>
+</head>
+<body class="bg-[#EEEEEE] text-gray-800">
+
+    <div id="sidebar" class="fixed inset-y-0 left-0 w-72 bg-white dark:bg-[#1e1f20] shadow-2xl z-[60] sidebar-hidden p-6 border-r dark:border-gray-800">
+        <div class="flex justify-between items-center mb-8">
+            <h2 class="text-xl font-bold tracking-tighter text-blue-600">目录索引</h2>
+            <button onclick="toggleSidebar()" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full">✕</button>
+        </div>
+        <div id="nav-list" class="overflow-y-auto max-h-[calc(100vh-150px)] space-y-4"></div>
+    </div>
+
+    <nav class="sticky top-0 z-50 bg-white/80 dark:bg-[#131314]/80 backdrop-blur-md border-b dark:border-gray-800">
+        <div class="max-w-[1600px] mx-auto px-6 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <button onclick="toggleSidebar()" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
+                </button>
+                <h1 class="text-lg font-bold">SAT 错题集</h1>
+            </div>
+            
+            <div class="flex items-center gap-1 bg-gray-200/50 dark:bg-gray-800 p-1 rounded-2xl">
+                <button onclick="switchTab('overview')" id="btn-overview" class="tab-btn px-4 py-1.5 rounded-xl text-sm font-bold transition-all">概览</button>
+                <button onclick="switchTab('reading')" id="btn-reading" class="tab-btn px-4 py-1.5 rounded-xl text-sm font-medium transition-all">阅读</button>
+                <button onclick="switchTab('grammar')" id="btn-grammar" class="tab-btn px-4 py-1.5 rounded-xl text-sm font-medium transition-all">语法</button>
+                <button onclick="switchTab('math')" id="btn-math" class="tab-btn px-4 py-1.5 rounded-xl text-sm font-medium transition-all">数学</button>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold opacity-50">复习模式</span>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="review-toggle" onchange="toggleReviewMode()" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                </div>
+                <button onclick="toggleDarkMode()" class="p-2 bg-gray-100 dark:bg-gray-800 rounded-xl">
+                    <span id="theme-icon">🌙</span>
+                </button>
             </div>
         </div>
     </nav>
 
-    <main class="max-w-5xl mx-auto p-4">
-        <div class="bg-white p-6 rounded-xl shadow-sm mb-8 mt-4 border border-blue-100">
-            <h3 class="text-sm font-bold text-blue-400 mb-2 uppercase">新增题型板块</h3>
-            <div class="flex gap-2">
-                <input type="text" id="newCatInput" placeholder="例如: 语法-标点符号 / 数学-二次函数" class="flex-1 p-2 border rounded-lg focus:ring-2 focus:ring-blue-400 outline-none">
-                <button onclick="addNewCategory()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">添加</button>
+    <main class="max-w-[1600px] mx-auto p-6">
+        <div id="overview" class="tab-content">
+            <div class="card bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-10 rounded-4xl shadow-xl mb-8 flex justify-between items-center">
+                <div>
+                    <p class="text-sm opacity-80 uppercase font-bold tracking-widest">累计专注学习时长</p>
+                    <h2 id="study-time" class="text-6xl font-black mt-2">0h 0m</h2>
+                </div>
+                <div class="flex gap-4 text-sm">
+                    <button onclick="exportData()" class="bg-white/20 hover:bg-white/30 px-6 py-3 rounded-2xl font-bold backdrop-blur transition-all">导出数据备份</button>
+                    <input type="file" id="import-file" class="hidden" onchange="importData(event)">
+                    <button onclick="document.getElementById('import-file').click()" class="bg-white/20 hover:bg-white/30 px-6 py-3 rounded-2xl font-bold backdrop-blur transition-all">导入数据恢复</button>
+                </div>
             </div>
-        </div>
 
-        <div id="content-area">
-            <!-- 动态生成的板块将出现在这里 -->
+            <div class="space-y-4 mb-12">
+                <div class="card bg-white dark:bg-[#1e1f20] rounded-3xl border dark:border-gray-800 overflow-hidden">
+                    <button onclick="toggleAccordion('acc-mastered')" class="w-full p-6 flex justify-between items-center bg-green-500/10">
+                        <span class="font-bold text-green-500">已熟练掌握 (Mastered)</span>
+                        <span id="mastered-count" class="font-black text-2xl text-green-500">0</span>
+                    </button>
+                    <div id="acc-mastered" class="hidden p-6 space-y-2 border-t dark:border-gray-800"></div>
+                </div>
+                <div class="card bg-white dark:bg-[#1e1f20] rounded-3xl border dark:border-gray-800 overflow-hidden">
+                    <button onclick="toggleAccordion('acc-inprogress')" class="w-full p-6 flex justify-between items-center bg-yellow-500/10">
+                        <span class="font-bold text-yellow-600">正在进行中 (In Progress)</span>
+                        <span id="inprogress-count" class="font-black text-2xl text-yellow-600">0</span>
+                    </button>
+                    <div id="acc-inprogress" class="hidden p-6 space-y-2 border-t dark:border-gray-800"></div>
+                </div>
+                <div class="card bg-white dark:bg-[#1e1f20] rounded-3xl border dark:border-gray-800 overflow-hidden">
+                    <button onclick="toggleAccordion('acc-notstarted')" class="w-full p-6 flex justify-between items-center bg-red-500/10">
+                        <span class="font-bold text-red-500">未开始题目 (Not Started)</span>
+                        <span id="notstarted-count" class="font-black text-2xl text-red-500">0</span>
+                    </button>
+                    <div id="acc-notstarted" class="hidden p-6 space-y-2 border-t dark:border-gray-800"></div>
+                </div>
+            </div>
+            <div id="date-grouped-container" class="space-y-8 mt-12"></div>
         </div>
+        <div id="dynamic-container"></div>
     </main>
 
-    <!-- 底部状态栏 -->
-    <div class="fixed bottom-0 left-0 right-0 bg-white border-t p-2 text-center text-xs text-gray-400">
-        存储状态: 浏览器本地大容量存储 (IndexedDB) 已启用
+    <div id="sorting-modal" class="fixed inset-0 bg-black/60 z-[100] hidden flex items-center justify-center p-6 backdrop-blur-sm">
+        <div class="bg-white dark:bg-[#1e1f20] w-full max-w-4xl max-h-[80vh] rounded-[3rem] overflow-hidden flex flex-col shadow-2xl border dark:border-gray-800">
+            <div class="p-8 border-b dark:border-gray-800 flex justify-between items-center bg-gray-50 dark:bg-white/5">
+                <h2 class="text-2xl font-bold">批量错题分拣采集</h2>
+                <button onclick="closeSortingModal()" class="text-gray-400 hover:text-red-500">取消上传</button>
+            </div>
+            <div id="sorting-list" class="flex-1 overflow-y-auto p-8 space-y-6"></div>
+            <div class="p-8 bg-gray-50 dark:bg-white/5 border-t dark:border-gray-800 flex justify-end">
+                <button onclick="processSortingBatch()" class="bg-blue-600 text-white px-12 py-4 rounded-3xl font-bold text-lg shadow-xl shadow-blue-500/20">确认分拣并入库</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="fab-container">
+        <span class="fab-label">批量分拣上传</span>
+        <button onclick="document.getElementById('batch-upload-input').click()" class="w-16 h-16 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-2xl hover:scale-110 transition-all">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="3" d="M12 4v16m8-8H4"></path></svg>
+        </button>
+        <input type="file" id="batch-upload-input" class="hidden" multiple accept="image/*" onchange="handleBatchUpload(event)">
+    </div>
+
+    <div id="lightbox" onclick="this.classList.add('hidden')" class="fixed inset-0 bg-black/95 z-[100] hidden flex items-center justify-center p-4 cursor-zoom-out">
+        <img id="lightbox-img" class="max-w-full max-h-full rounded-lg shadow-2xl">
     </div>
 
     <script>
-        // --- 数据库初始化 ---
-        const db = new Dexie("SAT_Notebook_DB");
+        const db = new Dexie("SAT_Final_Ultimate_V8");
         db.version(1).stores({
             categories: '++id, tab, title, notes',
-            questions: '++id, catId, image, correction'
+            questions: '++id, catId, image, correction, status, date, isStarred, correctAnswer, userAttempt'
         });
 
-        let currentTab = 'reading';
+        let currentTab = 'overview';
+        let activeCategoryId = null;
+        let isReviewMode = false;
+        let startTime = Date.now();
+        let sortingQueue = [];
 
-        // --- 核心功能 ---
+        async function switchTab(tab) {
+            currentTab = tab; activeCategoryId = null;
+            await renderView();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
 
-        async function loadAll() {
-            const container = document.getElementById('content-area');
-            container.innerHTML = '';
+        async function renderView() {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('font-bold', 'bg-white', 'text-blue-600'));
+            const activeBtn = document.getElementById('btn-' + currentTab);
+            if(activeBtn) activeBtn.classList.add('font-bold', 'bg-white', 'dark:bg-gray-700', 'text-blue-600');
+            const container = document.getElementById('dynamic-container');
+            const overview = document.getElementById('overview');
+            if (currentTab === 'overview') { overview.classList.add('active'); container.innerHTML = ''; await renderOverviewStats(); } 
+            else { overview.classList.remove('active'); if (activeCategoryId) await renderCategoryDetail(activeCategoryId); else await renderCategoryList(currentTab); }
+            renderSidebar();
+        }
+
+        async function renderCategoryList(tab) {
+            const container = document.getElementById('dynamic-container');
+            const cats = await db.categories.where('tab').equals(tab).toArray();
+            container.innerHTML = `
+                <div class="card bg-white dark:bg-[#1e1f20] p-6 rounded-3xl border dark:border-gray-800 mb-8 flex gap-3">
+                    <input type="text" id="newCatInput" placeholder="输入新题型板块名称..." class="custom-input flex-1 bg-gray-50 px-6 py-4 rounded-2xl outline-none border-none">
+                    <button onclick="addCategory()" class="bg-blue-600 text-white px-8 rounded-2xl font-bold">新建题型区块</button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="category-grid"></div>
+            `;
+            cats.forEach(cat => {
+                const block = document.createElement('div');
+                block.className = "card bg-white dark:bg-[#1e1f20] p-8 rounded-[2.5rem] border dark:border-gray-800 hover:border-blue-500 transition-all cursor-pointer group relative";
+                block.onclick = () => { activeCategoryId = cat.id; renderView(); };
+                block.innerHTML = `<h3 class="text-2xl font-bold mb-4">${cat.title}</h3><div class="text-gray-400 text-sm">点击进入记录与分析 →</div><button onclick="event.stopPropagation(); deleteCategory(${cat.id})" class="absolute top-6 right-6 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100">✕</button>`;
+                document.getElementById('category-grid').appendChild(block);
+            });
+        }
+
+        async function renderCategoryDetail(catId) {
+            const container = document.getElementById('dynamic-container');
+            const cat = await db.categories.get(catId);
+            if(!cat) return;
+            container.innerHTML = `
+                <div class="mb-6 flex items-center justify-between">
+                    <button onclick="activeCategoryId=null; renderView();" class="text-blue-500 font-bold flex items-center gap-2">← 返回列表</button>
+                    <span class="text-gray-400 font-bold uppercase text-xs">${cat.tab} / ${cat.title}</span>
+                </div>
+                <div class="mb-8"><h1 class="text-4xl font-black tracking-tighter">${cat.title}</h1></div>
+                <div class="card bg-white dark:bg-[#1e1f20] p-8 rounded-[3rem] mb-10 border dark:border-gray-800">
+                    <label class="text-xs font-bold text-blue-500 uppercase tracking-widest mb-3 block">题型核心解题策略</label>
+                    <textarea onchange="updateNotes(${cat.id}, this.value)" class="custom-input w-full p-6 bg-gray-50 rounded-3xl outline-none min-h-[100px] border-none">${cat.notes}</textarea>
+                </div>
+                <div id="questions-container" class="space-y-12"></div>
+                <div class="mt-12 p-12 border-4 border-dashed border-gray-300 dark:border-gray-700 rounded-[3.5rem] flex flex-col items-center justify-center group hover:border-blue-500 transition-all cursor-pointer relative">
+                    <input type="file" multiple accept="image/*" onchange="handleDirectUpload(event, ${catId})" class="absolute inset-0 opacity-0 cursor-pointer">
+                    <div class="text-blue-500 mb-2"><svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M12 4v16m8-8H4"></path></svg></div>
+                    <p class="text-xl font-bold text-gray-400 group-hover:text-blue-500">直接上传错题到此题型</p>
+                </div><div class="h-24"></div>
+            `;
+            const qs = await db.questions.where('catId').equals(catId).toArray();
+            qs.forEach((q, idx) => appendQuestionToDOM(q, idx + 1));
+        }
+
+        function appendQuestionToDOM(q, displayIdx) {
+            const qList = document.getElementById('questions-container');
+            const qDiv = document.createElement('div');
+            qDiv.id = `question-${q.id}`;
             
-            const cats = await db.categories.where('tab').equals(currentTab).toArray();
+            // 初始应用颜色代码类名
+            const statusCardClass = q.status === 'mastered' ? 'card-mastered' : q.status === 'in-progress' ? 'card-in-progress' : 'card-not-started';
+            const statusSelectClass = q.status === 'mastered' ? 'select-mastered' : q.status === 'in-progress' ? 'select-in-progress' : 'select-not-started';
             
-            for (const cat of cats) {
-                const section = await createCategoryElement(cat);
-                container.appendChild(section);
+            qDiv.className = `flex flex-col md:flex-row gap-8 relative p-4 transition-all duration-300 ${statusCardClass}`;
+            qDiv.innerHTML = `
+                <div class="w-full md:w-3/4 flex flex-col gap-3">
+                    <div class="card bg-white dark:bg-[#1e1f20] rounded-[3.5rem] p-4 border dark:border-gray-800 relative">
+                        <div class="absolute left-6 top-6 bg-blue-600 text-white text-xs font-bold px-4 py-1.5 rounded-full z-10 shadow-lg">题目 #${displayIdx}</div>
+                        <img src="${q.image}" onclick="zoomImage('${q.image}')" class="w-full object-contain rounded-[2.5rem] bg-gray-50 dark:bg-black/20 min-h-[300px] max-h-[1000px]">
+                    </div>
+                    <div class="flex items-center gap-6 px-6">
+                        <input type="date" value="${q.date}" onchange="updateQDate(${q.id}, this.value)" class="bg-transparent border-none text-xs font-bold text-blue-500 outline-none">
+                        <button onclick="toggleStar(${q.id}, this)" class="star-btn text-lg ${q.isStarred ? 'text-yellow-400' : 'text-gray-300'}">★ 重要</button>
+                    </div>
+                </div>
+                <div class="w-full md:w-1/4 flex flex-col gap-4">
+                    <div class="card bg-white dark:bg-[#1e1f20] p-6 rounded-[2.5rem] border dark:border-gray-800 flex-1 flex flex-col">
+                        <div class="mb-4 ${isReviewMode ? 'hidden' : 'block'}">
+                            <label class="text-[10px] font-bold text-gray-400 uppercase block mb-2">设置正确答案</label>
+                            <div class="grid grid-cols-4 gap-2">
+                                ${['A','B','C','D'].map(opt => `<div onclick="setAnswer(${q.id}, '${opt}')" class="choice-btn text-xs font-bold ${q.correctAnswer === opt ? 'bg-blue-600 text-white border-blue-600' : ''}">${opt}</div>`).join('')}
+                            </div>
+                        </div>
+                        <div class="flex-1 ${isReviewMode ? 'hidden' : 'block'} flex flex-col">
+                            <label class="text-[10px] font-bold text-gray-400 uppercase block mb-2">分析与总结</label>
+                            <textarea onchange="updateQText(${q.id}, this.value)" class="custom-input w-full p-4 bg-gray-50 rounded-2xl border-none outline-none flex-1 min-h-[200px]">${q.correction || ''}</textarea>
+                        </div>
+                        <div class="${isReviewMode ? 'block' : 'hidden'} flex-1">
+                            <label class="text-[10px] font-bold text-blue-500 uppercase block mb-4 tracking-widest text-center">复习自测</label>
+                            <div class="grid grid-cols-1 gap-3">
+                                ${['A','B','C','D'].map(opt => `<div onclick="makeAttempt(${q.id}, '${opt}', '${q.correctAnswer}')" id="att-${q.id}-${opt}" class="choice-btn py-4 font-bold ${q.userAttempt === opt ? (opt === q.correctAnswer ? 'choice-correct' : 'choice-wrong') : ''}">选项 ${opt}</div>`).join('')}
+                            </div>
+                        </div>
+                        <div class="mt-4 pt-4 border-t dark:border-gray-800 flex justify-between items-center gap-2">
+                            <!-- 核心变色下拉框 -->
+                            <select onchange="updateQStatus(${q.id}, this)" class="status-select flex-1 text-[11px] font-bold px-4 py-2 rounded-full outline-none transition-all shadow-sm cursor-pointer ${statusSelectClass}">
+                                <option value="not-started" ${q.status === 'not-started' ? 'selected' : ''}>未开始</option>
+                                <option value="in-progress" ${q.status === 'in-progress' ? 'selected' : ''}>进行中</option>
+                                <option value="mastered" ${q.status === 'mastered' ? 'selected' : ''}>已掌握</option>
+                            </select>
+                            <button onclick="deleteQuestion(${q.id}, this)" class="text-[10px] text-gray-400 hover:text-red-500 p-1">删除</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            qList.appendChild(qDiv);
+        }
+
+        async function updateQStatus(id, el) {
+            const newVal = el.value;
+            await db.questions.update(id, { status: newVal });
+            
+            const card = document.getElementById(`question-${id}`);
+            
+            // 实时同步下拉框和卡片的颜色代码
+            card.classList.remove('card-mastered', 'card-in-progress', 'card-not-started');
+            el.classList.remove('select-mastered', 'select-in-progress', 'select-not-started');
+
+            if (newVal === 'mastered') {
+                card.classList.add('card-mastered');
+                el.classList.add('select-mastered');
+            } else if (newVal === 'in-progress') {
+                card.classList.add('card-in-progress');
+                el.classList.add('select-in-progress');
+            } else {
+                card.classList.add('card-not-started');
+                el.classList.add('select-not-started');
             }
         }
 
-        async function addNewCategory() {
-            const input = document.getElementById('newCatInput');
-            if (!input.value) return;
-            
-            await db.categories.add({
-                tab: currentTab,
-                title: input.value,
-                notes: ''
-            });
-            
-            input.value = '';
-            loadAll();
+        async function handleDirectUpload(e, catId) {
+            const files = Array.from(e.target.files);
+            const today = new Date().toISOString().split('T')[0];
+            const qCount = document.getElementById('questions-container').children.length;
+            for (let i = 0; i < files.length; i++) {
+                const base64 = await toBase64(files[i]);
+                const newId = await db.questions.add({ catId: parseInt(catId), image: base64, correction: '', status: 'not-started', date: today, isStarred: false, correctAnswer: '', userAttempt: '' });
+                const newQ = await db.questions.get(newId);
+                appendQuestionToDOM(newQ, qCount + i + 1);
+            }
         }
 
-        async function createCategoryElement(cat) {
-            const div = document.createElement('div');
-            div.className = "mb-10 bg-white rounded-xl shadow-md border overflow-hidden";
-            div.innerHTML = `
-                <div class="bg-gray-800 text-white p-4 flex justify-between">
-                    <h2 class="font-bold">${cat.title}</h2>
-                    <button onclick="deleteCategory(${cat.id})" class="text-xs opacity-50 hover:opacity-100">删除板块</button>
-                </div>
-                <div class="p-4">
-                    <textarea onchange="updateNotes(${cat.id}, this.value)" placeholder="此处填写该题型通用笔记..." class="w-full p-3 bg-yellow-50 rounded-lg text-sm border-none focus:ring-1 focus:ring-yellow-300 mb-4">${cat.notes}</textarea>
-                    <div id="questions-${cat.id}" class="space-y-4"></div>
-                    <button onclick="addQuestion(${cat.id})" class="w-full mt-4 py-2 border-2 border-dashed border-gray-200 text-gray-400 rounded-lg hover:border-blue-300 hover:text-blue-500 transition">+ 添加错题</button>
-                </div>
-            `;
-
-            // 加载该类别下的题目
-            const qs = await db.questions.where('catId').equals(cat.id).toArray();
-            const qContainer = div.querySelector(`#questions-${cat.id}`);
-            qs.forEach(q => {
-                const qDiv = document.createElement('div');
-                qDiv.className = "grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg relative";
-                qDiv.innerHTML = `
-                    <button onclick="deleteQuestion(${q.id})" class="absolute top-1 right-1 text-gray-300 hover:text-red-500">✕</button>
-                    <div class="border-2 border-dashed rounded bg-white flex flex-col items-center justify-center min-h-[150px] overflow-hidden">
-                        ${q.image ? `<img src="${q.image}" class="max-w-full">` : `<input type="file" onchange="uploadImg(${q.id}, this)" class="text-xs">`}
-                    </div>
-                    <textarea onchange="updateQuestionText(${q.id}, this.value)" placeholder="错误原因与总结..." class="p-2 text-sm border rounded h-full">${q.correction || ''}</textarea>
-                `;
-                qContainer.appendChild(qDiv);
-            });
-
-            return div;
+        async function toggleStar(id, btn) {
+            const q = await db.questions.get(id);
+            const newState = !q.isStarred;
+            await db.questions.update(id, { isStarred: newState });
+            btn.className = `star-btn text-lg ${newState ? 'text-yellow-400' : 'text-gray-300'}`;
         }
 
-        async function addQuestion(catId) {
-            await db.questions.add({ catId: catId, image: '', correction: '' });
-            loadAll();
-        }
+        async function renderOverviewStats() {
+            const qs = await db.questions.toArray();
+            const cats = await db.categories.toArray();
+            document.getElementById('mastered-count').innerText = qs.filter(q => q.status === 'mastered').length;
+            document.getElementById('inprogress-count').innerText = qs.filter(q => q.status === 'in-progress').length;
+            document.getElementById('notstarted-count').innerText = qs.filter(q => q.status === 'not-started').length;
 
-        async function uploadImg(qId, input) {
-            const file = input.files[0];
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                await db.questions.update(qId, { image: e.target.result });
-                loadAll();
+            const renderAcc = (id, list) => {
+                const el = document.getElementById(id); el.innerHTML = list.length ? '' : '<p class="text-xs opacity-50 py-2 text-center">无数据...</p>';
+                list.forEach(q => {
+                    const c = cats.find(x => x.id === q.catId);
+                    el.innerHTML += `<div class="flex justify-between items-center p-3 hover:bg-gray-50 dark:hover:bg-white/5 rounded-xl transition-all ${q.isStarred ? 'bg-yellow-50 dark:bg-yellow-900/10' : ''}"><span class="text-sm font-bold opacity-70">${q.isStarred ? '★ ' : ''}${c?.title || '未命名'}</span><button onclick="jumpTo('${c?.tab}', ${c?.id}, ${q.id})" class="text-[10px] bg-blue-600 text-white px-3 py-1 rounded-lg">前往</button></div>`;
+                });
             };
-            reader.readAsDataURL(file);
+            renderAcc('acc-mastered', qs.filter(q => q.status === 'mastered'));
+            renderAcc('acc-inprogress', qs.filter(q => q.status === 'in-progress'));
+            renderAcc('acc-notstarted', qs.filter(q => q.status === 'not-started'));
+
+            const dateBox = document.getElementById('date-grouped-container'); dateBox.innerHTML = '';
+            const grouped = {}; qs.forEach(q => { if(!grouped[q.date]) grouped[q.date] = []; grouped[q.date].push(q); });
+            Object.keys(grouped).sort().reverse().forEach(d => {
+                const wrap = document.createElement('div');
+                wrap.innerHTML = `<h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 border-l-2 border-blue-500 pl-2 ml-1">${d}</h4><div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="date-${d}"></div>`;
+                dateBox.appendChild(wrap);
+                grouped[d].forEach(q => {
+                    const cat = cats.find(c => c.id === q.catId);
+                    document.getElementById(`date-${d}`).innerHTML += `<div class="card bg-white dark:bg-[#1e1f20] p-4 rounded-3xl border dark:border-gray-800 flex justify-between items-center shadow-sm ${q.isStarred ? 'starred-card' : ''}"><div class="text-sm font-bold truncate max-w-[150px]">${q.isStarred ? '★ ' : ''}${cat?.title}</div><button onclick="jumpTo('${cat?.tab}', ${cat?.id}, ${q.id})" class="text-[10px] font-bold text-blue-500">详情</button></div>`;
+                });
+            });
         }
 
+        async function jumpTo(tab, catId, qId) { currentTab = tab; activeCategoryId = catId; await renderView(); setTimeout(() => { const el = document.getElementById(`question-${qId}`); if (el) { window.scrollTo({ top: el.offsetTop - 120, behavior: 'smooth' }); el.classList.add('jump-highlight'); setTimeout(() => el.classList.remove('jump-highlight'), 2000); } }, 100); }
+        async function setAnswer(id, val) { await db.questions.update(id, { correctAnswer: val }); renderCategoryDetail(activeCategoryId); }
+        async function makeAttempt(id, val, correct) {
+            await db.questions.update(id, { userAttempt: val });
+            const target = document.getElementById(`att-${id}-${val}`);
+            if(val === correct) target.classList.add('choice-correct'); else target.classList.add('choice-wrong');
+        }
+
+        function toggleReviewMode() { isReviewMode = document.getElementById('review-toggle').checked; if(activeCategoryId) renderCategoryDetail(activeCategoryId); }
+        function toggleAccordion(id) { document.getElementById(id).classList.toggle('hidden'); }
+        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('sidebar-hidden'); }
+        function closeSortingModal() { document.getElementById('sorting-modal').classList.add('hidden'); }
+        function updateSortingItem(idx, key, val) { sortingQueue[idx][key] = val; if(key === 'subject') renderSortingModal(); }
+        function toBase64(file) { return new Promise((r) => { const f = new FileReader(); f.readAsDataURL(file); f.onload = () => r(f.result); }); }
+
+        async function handleBatchUpload(e) {
+            const files = Array.from(e.target.files); const today = new Date().toISOString().split('T')[0]; sortingQueue = [];
+            for (const file of files) { const b64 = await toBase64(file); sortingQueue.push({ id: Date.now()+Math.random(), image: b64, subject: 'reading', catId: 'new', date: today }); }
+            renderSortingModal();
+        }
+
+        async function renderSortingModal() {
+            const modal = document.getElementById('sorting-modal'); const list = document.getElementById('sorting-list');
+            modal.classList.remove('hidden'); list.innerHTML = ''; const allCats = await db.categories.toArray();
+            sortingQueue.forEach((item, index) => {
+                const row = document.createElement('div'); row.className = "flex gap-6 p-6 bg-gray-50 dark:bg-white/5 rounded-3xl border dark:border-gray-800";
+                row.innerHTML = `<img src="${item.image}" class="w-32 h-32 object-cover rounded-xl"><div class="flex-1 grid grid-cols-2 gap-4">
+                    <div><label class="text-[10px] font-bold block mb-1 uppercase text-blue-500">科目</label><select onchange="updateSortingItem(${index}, 'subject', this.value)" class="custom-input w-full p-3 rounded-xl bg-white outline-none"><option value="reading">阅读</option><option value="grammar">语法</option><option value="math">数学</option></select></div>
+                    <div><label class="text-[10px] font-bold block mb-1 uppercase text-blue-500">日期</label><input type="date" value="${item.date}" onchange="updateSortingItem(${index}, 'date', this.value)" class="custom-input w-full p-3 rounded-xl bg-white outline-none"></div>
+                    <div><label class="text-[10px] font-bold block mb-1 uppercase text-blue-500">归属板块</label><select onchange="updateSortingItem(${index}, 'catId', this.value)" class="custom-input w-full p-3 rounded-xl bg-white outline-none"><option value="new">新建...</option>${allCats.filter(c => c.tab === item.subject).map(c => `<option value="${c.id}">${c.title}</option>`).join('')}</select></div>
+                    <div><label class="text-[10px] font-bold block mb-1 uppercase text-blue-500">新建板块名</label><input type="text" oninput="updateSortingItem(${index}, 'newCatTitle', this.value)" class="custom-input w-full p-3 rounded-xl bg-white border-2 border-blue-500/10 outline-none"></div>
+                </div>`;
+                list.appendChild(row);
+            });
+        }
+
+        async function processSortingBatch() {
+            for (const item of sortingQueue) {
+                let tid = item.catId; if (tid === 'new' && item.newCatTitle) tid = await db.categories.add({ tab: item.subject, title: item.newCatTitle, notes: '' });
+                if (tid !== 'new') await db.questions.add({ catId: parseInt(tid), image: item.image, correction: '', status: 'not-started', date: item.date, isStarred: false, correctAnswer: '', userAttempt: '' });
+            }
+            closeSortingModal(); renderView();
+        }
+
+        async function exportData() {
+            const data = { cats: await db.categories.toArray(), qs: await db.questions.toArray() };
+            const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `SAT_Notebook_Backup.json`; a.click();
+        }
+
+        async function importData(e) {
+            const reader = new FileReader(); reader.onload = async (ev) => {
+                const data = JSON.parse(ev.target.result); await db.categories.clear(); await db.questions.clear();
+                await db.categories.bulkAdd(data.cats); await db.questions.bulkAdd(data.qs); location.reload();
+            };
+            reader.readAsText(e.target.files[0]);
+        }
+
+        async function addCategory() { const inp = document.getElementById('newCatInput'); if(inp.value) { await db.categories.add({ tab: currentTab, title: inp.value, notes: '' }); inp.value=''; renderView(); } }
         async function updateNotes(id, val) { await db.categories.update(id, { notes: val }); }
-        async function updateQuestionText(id, val) { await db.questions.update(id, { correction: val }); }
-        async function deleteCategory(id) { if(confirm('确定删除?')) { await db.categories.delete(id); loadAll(); } }
-        async function deleteQuestion(id) { await db.questions.delete(id); loadAll(); }
+        async function updateQText(id, val) { await db.questions.update(id, { correction: val }); }
+        async function updateQDate(id, val) { await db.questions.update(id, { date: val }); }
+        async function deleteCategory(id) { if(confirm('确定删除此板块？')) { await db.categories.delete(id); await db.questions.where('catId').equals(id).delete(); renderView(); } }
+        async function deleteQuestion(id, btn) { if(confirm('确定删除此题？')) { await db.questions.delete(id); btn.closest('.flex-col').parentElement.remove(); } }
 
-        function switchTab(tab) {
-            currentTab = tab;
-            document.querySelectorAll('.tab-btn').forEach(b => b.className = 'tab-btn pb-2 text-gray-500');
-            document.getElementById('tab-'+tab).className = 'tab-btn pb-2 active-tab font-bold';
-            loadAll();
+        setInterval(() => {
+            let total = parseInt(localStorage.getItem('studyTime') || 0) + Math.floor((Date.now() - startTime) / 1000);
+            const st = document.getElementById('study-time'); if(st) st.innerText = `${Math.floor(total/3600)}h ${Math.floor((total%3600)/60)}m`;
+            localStorage.setItem('studyTimeLast', total);
+        }, 10000);
+        
+        window.onbeforeunload = () => localStorage.setItem('studyTime', localStorage.getItem('studyTimeLast'));
+
+        function toggleDarkMode() { document.documentElement.classList.toggle('dark'); localStorage.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light'; }
+        function zoomImage(src) { document.getElementById('lightbox-img').src = src; document.getElementById('lightbox').classList.remove('hidden'); }
+
+        async function renderSidebar() {
+            const list = document.getElementById('nav-list'); list.innerHTML = '';
+            const groups = [{id:'reading', l:'阅读板块'}, {id:'grammar', l:'语法板块'}, {id:'math', l:'数学板块'}];
+            for(const g of groups) {
+                const cats = await db.categories.where('tab').equals(g.id).toArray();
+                if(cats.length) {
+                    list.innerHTML += `<div class="text-[10px] font-bold text-blue-500 uppercase mt-4 mb-2 tracking-widest pl-1">${g.l}</div>`;
+                    cats.forEach(c => {
+                        const i = document.createElement('div'); i.className = "p-3 bg-gray-50 dark:bg-gray-800 rounded-xl mb-1 text-sm font-bold cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/10"; i.innerText = c.title;
+                        i.onclick = () => jumpTo(g.id, c.id, null); list.appendChild(i);
+                    });
+                }
+            }
         }
-
-        window.onload = loadAll;
+        window.onload = () => { if(localStorage.theme === 'dark') document.documentElement.classList.add('dark'); renderView(); };
     </script>
 </body>
 </html>
