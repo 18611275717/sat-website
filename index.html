@@ -27,12 +27,11 @@
         #sidebar { transition: transform 0.3s ease; }
         .sidebar-hidden { transform: translateX(-100%); }
 
-        /* 核心：卡片边框颜色代码 (Color Coding) */
+        /* 状态颜色定义 (Color Coding) */
         .card-not-started { border-left: 8px solid #ef4444 !important; }
         .card-in-progress { border-left: 8px solid #f59e0b !important; }
         .card-mastered { border-left: 8px solid #10b981 !important; }
 
-        /* 核心：下拉菜单按钮颜色代码 (Color Coding) */
         .select-not-started { background-color: #ef4444 !important; color: white !important; border: none !important; }
         .select-in-progress { background-color: #f59e0b !important; color: white !important; border: none !important; }
         .select-mastered { background-color: #10b981 !important; color: white !important; border: none !important; }
@@ -56,6 +55,7 @@
 </head>
 <body class="bg-[#EEEEEE] text-gray-800">
 
+    <!-- 侧边导航 -->
     <div id="sidebar" class="fixed inset-y-0 left-0 w-72 bg-white dark:bg-[#1e1f20] shadow-2xl z-[60] sidebar-hidden p-6 border-r dark:border-gray-800">
         <div class="flex justify-between items-center mb-8">
             <h2 class="text-xl font-bold tracking-tighter text-blue-600">目录索引</h2>
@@ -64,6 +64,7 @@
         <div id="nav-list" class="overflow-y-auto max-h-[calc(100vh-150px)] space-y-4"></div>
     </div>
 
+    <!-- 顶栏 -->
     <nav class="sticky top-0 z-50 bg-white/80 dark:bg-[#131314]/80 backdrop-blur-md border-b dark:border-gray-800">
         <div class="max-w-[1600px] mx-auto px-6 h-16 flex items-center justify-between">
             <div class="flex items-center gap-4">
@@ -97,6 +98,7 @@
 
     <main class="max-w-[1600px] mx-auto p-6">
         <div id="overview" class="tab-content">
+            <!-- 统计时长 -->
             <div class="card bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-10 rounded-4xl shadow-xl mb-8 flex justify-between items-center">
                 <div>
                     <p class="text-sm opacity-80 uppercase font-bold tracking-widest">累计专注学习时长</p>
@@ -109,6 +111,7 @@
                 </div>
             </div>
 
+            <!-- 下拉列表 -->
             <div class="space-y-4 mb-12">
                 <div class="card bg-white dark:bg-[#1e1f20] rounded-3xl border dark:border-gray-800 overflow-hidden">
                     <button onclick="toggleAccordion('acc-mastered')" class="w-full p-6 flex justify-between items-center bg-green-500/10">
@@ -137,6 +140,7 @@
         <div id="dynamic-container"></div>
     </main>
 
+    <!-- 批量上传 -->
     <div id="sorting-modal" class="fixed inset-0 bg-black/60 z-[100] hidden flex items-center justify-center p-6 backdrop-blur-sm">
         <div class="bg-white dark:bg-[#1e1f20] w-full max-w-4xl max-h-[80vh] rounded-[3rem] overflow-hidden flex flex-col shadow-2xl border dark:border-gray-800">
             <div class="p-8 border-b dark:border-gray-800 flex justify-between items-center bg-gray-50 dark:bg-white/5">
@@ -150,6 +154,7 @@
         </div>
     </div>
 
+    <!-- 悬浮按钮 -->
     <div class="fab-container">
         <span class="fab-label">批量分拣上传</span>
         <button onclick="document.getElementById('batch-upload-input').click()" class="w-16 h-16 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-2xl hover:scale-110 transition-all">
@@ -158,12 +163,13 @@
         <input type="file" id="batch-upload-input" class="hidden" multiple accept="image/*" onchange="handleBatchUpload(event)">
     </div>
 
+    <!-- 灯箱 -->
     <div id="lightbox" onclick="this.classList.add('hidden')" class="fixed inset-0 bg-black/95 z-[100] hidden flex items-center justify-center p-4 cursor-zoom-out">
         <img id="lightbox-img" class="max-w-full max-h-full rounded-lg shadow-2xl">
     </div>
 
     <script>
-        const db = new Dexie("SAT_Final_Ultimate_V8");
+        const db = new Dexie("SAT_Notebook_Final_V9");
         db.version(1).stores({
             categories: '++id, tab, title, notes',
             questions: '++id, catId, image, correction, status, date, isStarred, correctAnswer, userAttempt'
@@ -174,6 +180,33 @@
         let isReviewMode = false;
         let startTime = Date.now();
         let sortingQueue = [];
+
+        // --- 计时器核心修复 ---
+        function runTimer() {
+            // 获取存储的时间，确保它是数字
+            let storedTime = localStorage.getItem('studyTime');
+            let baseSeconds = parseInt(storedTime);
+            if (isNaN(baseSeconds)) baseSeconds = 0;
+
+            let sessionSeconds = Math.floor((Date.now() - startTime) / 1000);
+            let total = baseSeconds + sessionSeconds;
+
+            if (isNaN(total)) total = 0;
+
+            const stElement = document.getElementById('study-time');
+            if (stElement) {
+                const hrs = Math.floor(total / 3600);
+                const mins = Math.floor((total % 3600) / 60);
+                stElement.innerText = `${hrs}h ${mins}m`;
+            }
+            
+            // 实时存回 studyTime，不依赖页面关闭事件，更安全
+            localStorage.setItem('studyTime', total.toString());
+            // 每次运行重置 startTime 为现在，计算下一段间隔
+            startTime = Date.now();
+        }
+        // 每10秒自动保存一次
+        setInterval(runTimer, 10000);
 
         async function switchTab(tab) {
             currentTab = tab; activeCategoryId = null;
@@ -190,6 +223,7 @@
             if (currentTab === 'overview') { overview.classList.add('active'); container.innerHTML = ''; await renderOverviewStats(); } 
             else { overview.classList.remove('active'); if (activeCategoryId) await renderCategoryDetail(activeCategoryId); else await renderCategoryList(currentTab); }
             renderSidebar();
+            runTimer(); // 切换时立即运行一次显示时间
         }
 
         async function renderCategoryList(tab) {
@@ -240,8 +274,6 @@
             const qList = document.getElementById('questions-container');
             const qDiv = document.createElement('div');
             qDiv.id = `question-${q.id}`;
-            
-            // 初始应用颜色代码类名
             const statusCardClass = q.status === 'mastered' ? 'card-mastered' : q.status === 'in-progress' ? 'card-in-progress' : 'card-not-started';
             const statusSelectClass = q.status === 'mastered' ? 'select-mastered' : q.status === 'in-progress' ? 'select-in-progress' : 'select-not-started';
             
@@ -276,7 +308,6 @@
                             </div>
                         </div>
                         <div class="mt-4 pt-4 border-t dark:border-gray-800 flex justify-between items-center gap-2">
-                            <!-- 核心变色下拉框 -->
                             <select onchange="updateQStatus(${q.id}, this)" class="status-select flex-1 text-[11px] font-bold px-4 py-2 rounded-full outline-none transition-all shadow-sm cursor-pointer ${statusSelectClass}">
                                 <option value="not-started" ${q.status === 'not-started' ? 'selected' : ''}>未开始</option>
                                 <option value="in-progress" ${q.status === 'in-progress' ? 'selected' : ''}>进行中</option>
@@ -293,23 +324,12 @@
         async function updateQStatus(id, el) {
             const newVal = el.value;
             await db.questions.update(id, { status: newVal });
-            
             const card = document.getElementById(`question-${id}`);
-            
-            // 实时同步下拉框和卡片的颜色代码
             card.classList.remove('card-mastered', 'card-in-progress', 'card-not-started');
             el.classList.remove('select-mastered', 'select-in-progress', 'select-not-started');
-
-            if (newVal === 'mastered') {
-                card.classList.add('card-mastered');
-                el.classList.add('select-mastered');
-            } else if (newVal === 'in-progress') {
-                card.classList.add('card-in-progress');
-                el.classList.add('select-in-progress');
-            } else {
-                card.classList.add('card-not-started');
-                el.classList.add('select-not-started');
-            }
+            if (newVal === 'mastered') { card.classList.add('card-mastered'); el.classList.add('select-mastered'); } 
+            else if (newVal === 'in-progress') { card.classList.add('card-in-progress'); el.classList.add('select-in-progress'); } 
+            else { card.classList.add('card-not-started'); el.classList.add('select-not-started'); }
         }
 
         async function handleDirectUpload(e, catId) {
@@ -337,7 +357,6 @@
             document.getElementById('mastered-count').innerText = qs.filter(q => q.status === 'mastered').length;
             document.getElementById('inprogress-count').innerText = qs.filter(q => q.status === 'in-progress').length;
             document.getElementById('notstarted-count').innerText = qs.filter(q => q.status === 'not-started').length;
-
             const renderAcc = (id, list) => {
                 const el = document.getElementById(id); el.innerHTML = list.length ? '' : '<p class="text-xs opacity-50 py-2 text-center">无数据...</p>';
                 list.forEach(q => {
@@ -348,7 +367,6 @@
             renderAcc('acc-mastered', qs.filter(q => q.status === 'mastered'));
             renderAcc('acc-inprogress', qs.filter(q => q.status === 'in-progress'));
             renderAcc('acc-notstarted', qs.filter(q => q.status === 'not-started'));
-
             const dateBox = document.getElementById('date-grouped-container'); dateBox.innerHTML = '';
             const grouped = {}; qs.forEach(q => { if(!grouped[q.date]) grouped[q.date] = []; grouped[q.date].push(q); });
             Object.keys(grouped).sort().reverse().forEach(d => {
@@ -427,31 +445,6 @@
         async function deleteCategory(id) { if(confirm('确定删除此板块？')) { await db.categories.delete(id); await db.questions.where('catId').equals(id).delete(); renderView(); } }
         async function deleteQuestion(id, btn) { if(confirm('确定删除此题？')) { await db.questions.delete(id); btn.closest('.flex-col').parentElement.remove(); } }
 
-        setInterval(() => {
-            let total = parseInt(localStorage.getItem('studyTime') || 0) + Math.floor((Date.now() - startTime) / 1000);
-            const st = document.getElementById('study-time'); if(st) st.innerText = `${Math.floor(total/3600)}h ${Math.floor((total%3600)/60)}m`;
-            localStorage.setItem('studyTimeLast', total);
-        }, 10000);
-        
-        window.onbeforeunload = () => localStorage.setItem('studyTime', localStorage.getItem('studyTimeLast'));
-
-        function toggleDarkMode() { document.documentElement.classList.toggle('dark'); localStorage.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light'; }
-        function zoomImage(src) { document.getElementById('lightbox-img').src = src; document.getElementById('lightbox').classList.remove('hidden'); }
-
-        async function renderSidebar() {
-            const list = document.getElementById('nav-list'); list.innerHTML = '';
-            const groups = [{id:'reading', l:'阅读板块'}, {id:'grammar', l:'语法板块'}, {id:'math', l:'数学板块'}];
-            for(const g of groups) {
-                const cats = await db.categories.where('tab').equals(g.id).toArray();
-                if(cats.length) {
-                    list.innerHTML += `<div class="text-[10px] font-bold text-blue-500 uppercase mt-4 mb-2 tracking-widest pl-1">${g.l}</div>`;
-                    cats.forEach(c => {
-                        const i = document.createElement('div'); i.className = "p-3 bg-gray-50 dark:bg-gray-800 rounded-xl mb-1 text-sm font-bold cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/10"; i.innerText = c.title;
-                        i.onclick = () => jumpTo(g.id, c.id, null); list.appendChild(i);
-                    });
-                }
-            }
-        }
         window.onload = () => { if(localStorage.theme === 'dark') document.documentElement.classList.add('dark'); renderView(); };
     </script>
 </body>
